@@ -14,65 +14,19 @@ SECONDARY_ACCENT = "#ffa800"
 NEUTRAL_COLOR = "#686767"
 
 # ==============================
-# CUSTOM CSS FOR BRANDING
-# ==============================
-st.markdown(f"""
-    <style>
-        .main {{
-            background-color: #f9f9f9;
-        }}
-        .header {{
-            text-align: center;
-            padding: 20px;
-        }}
-        .header img {{
-            width: 200px;
-        }}
-        .step-title {{
-            color: {PRIMARY_COLOR};
-            font-size: 22px;
-            font-weight: bold;
-            margin-top: 20px;
-        }}
-        .instructions {{
-            color: {NEUTRAL_COLOR};
-            font-size: 16px;
-            margin-bottom: 10px;
-        }}
-        .stButton>button {{
-            background-color: {PRIMARY_COLOR};
-            color: white;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-size: 16px;
-        }}
-        .stDownloadButton>button {{
-            background-color: {ACCENT_COLOR};
-            color: white;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-size: 16px;
-        }}
-    </style>
-""", unsafe_allow_html=True)
-
-# ==============================
 # HEADER
 # ==============================
 st.markdown(f"""
-<div class="header">
-    {CLINQURE_LOGO}
-    <h1 style="color:{PRIMARY_COLOR};">ClinQure Data Consolidation Tool</h1>
-    <p style="color:{NEUTRAL_COLOR}; font-size:18px;">Upload, Map, and Consolidate Your Clinical Data Seamlessly</p>
-</div>
+{CLINQURE_LOGO}
+## ClinQure Data Consolidation Tool
+
+Upload, Map, and Consolidate Your Clinical Data Seamlessly
 """, unsafe_allow_html=True)
 
 # ==============================
 # STEP 1: UPLOAD MULTIPLE FILES
 # ==============================
-st.markdown('<div class="step-title">Step 1: Upload Your Files</div>', unsafe_allow_html=True)
-st.markdown('<div class="instructions">Upload multiple CSV or Excel files to begin.</div>', unsafe_allow_html=True)
-
+st.markdown('### Step 1: Upload Your Files')
 uploaded_files = st.file_uploader("Upload CSV or Excel files", type=["csv", "xlsx"], accept_multiple_files=True)
 
 # ==============================
@@ -100,7 +54,6 @@ def create_draft_mapping_excel(files, cutoff):
 
     rows = [{"Standard_Name": k, "Variations": ", ".join(v)} for k, v in mapping_dict.items()]
     draft_df = pd.DataFrame(rows)
-
     output = BytesIO()
     draft_df.to_excel(output, index=False)
     output.seek(0)
@@ -115,7 +68,6 @@ def convert_excel_to_json(file):
         mapping_dict[standard] = variations
     return mapping_dict
 
-
 def consolidate_files(files, mapping_dict):
     reverse_map = {variation: standard for standard, variations in mapping_dict.items() for variation in variations}
     dfs = []
@@ -127,12 +79,10 @@ def consolidate_files(files, mapping_dict):
     for idx, file in enumerate(files):
         progress.progress((idx + 1) / total_files)
 
-        # Validate file type
         if not (file.name.endswith(".csv") or file.name.endswith(".xlsx")):
-            st.error(f"File {file.name} is not a supported format. Please upload CSV or Excel files.")
+            st.error(f"File {file.name} is not a supported format.")
             continue
 
-        # Check if file is empty
         if file.size == 0:
             st.error(f"File {file.name} is empty. Skipping...")
             continue
@@ -141,14 +91,11 @@ def consolidate_files(files, mapping_dict):
 
         try:
             df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file, engine="openpyxl")
-
-            # Normalize and map columns
             new_cols = []
             for col in df.columns:
                 normalized = col.strip().lower().replace(" ", "_")
                 new_cols.append(reverse_map.get(normalized, normalized))
             df.columns = new_cols
-
             dfs.append(df)
 
         except pd.errors.EmptyDataError:
@@ -159,12 +106,11 @@ def consolidate_files(files, mapping_dict):
             continue
 
     if not dfs:
-        st.warning("No valid files were processed. Please check your uploads.")
+        st.warning("No valid files were processed.")
         return None, None, None
 
     consolidated_df = pd.concat(dfs, ignore_index=True)
 
-    # Prepare outputs
     excel_buffer = BytesIO()
     consolidated_df.to_excel(excel_buffer, index=False)
     excel_buffer.seek(0)
@@ -176,33 +122,27 @@ def consolidate_files(files, mapping_dict):
     st.success("Files consolidated successfully!")
     return consolidated_df, excel_buffer, csv_buffer
 
-
 # ==============================
 # STEP 2: GENERATE DRAFT MAPPING
 # ==============================
 if uploaded_files:
-    st.markdown('<div class="step-title">Step 2: Generate Draft Mapping</div>', unsafe_allow_html=True)
-    st.markdown('<div class="instructions">Adjust similarity threshold and download the draft mapping Excel file.</div>', unsafe_allow_html=True)
-
+    st.markdown('### Step 2: Generate Draft Mapping')
     cutoff = st.slider("Fuzzy Matching Threshold", 0.6, 0.9, 0.8, 0.05)
 
-    
-with st.spinner("Generating draft mapping, please wait..."):
-    draft_excel = create_draft_mapping_excel(uploaded_files, cutoff)
+    with st.spinner("Generating draft mapping, please wait..."):
+        draft_excel = create_draft_mapping_excel(uploaded_files, cutoff)
 
     st.download_button("Download Draft Mapping Excel", data=draft_excel, file_name="draft_mapping.xlsx")
 
 # ==============================
 # STEP 3: UPLOAD EDITED MAPPING
 # ==============================
-st.markdown('<div class="step-title">Step 3: Upload Edited Mapping File</div>', unsafe_allow_html=True)
+st.markdown('### Step 3: Upload Edited Mapping File')
 edited_mapping_file = st.file_uploader("Upload your edited mapping Excel file", type=["xlsx"])
 
 if edited_mapping_file:
     mapping_dict = convert_excel_to_json(edited_mapping_file)
-
-    # Preview mapping
-    st.markdown('<div class="instructions">Preview your mappings before consolidation:</div>', unsafe_allow_html=True)
+    st.markdown('Preview your mappings before consolidation:')
     preview_rows = [{"Standard Name": k, "Mapped Variations": ", ".join(v)} for k, v in mapping_dict.items()]
     st.dataframe(pd.DataFrame(preview_rows))
 
@@ -210,18 +150,13 @@ if edited_mapping_file:
 # STEP 4: CONSOLIDATE FILES
 # ==============================
 if edited_mapping_file and uploaded_files:
-    st.markdown('<div class="step-title">Step 4: Consolidate Files</div>', unsafe_allow_html=True)
-    st.markdown('<div class="instructions">Preview the consolidated data below, then download the final files.</div>', unsafe_allow_html=True)
+    st.markdown('### Step 4: Consolidate Files')
+    st.markdown('Preview the consolidated data below, then download the final files.')
 
-    consolidated_df, excel_output, csv_output = consolidate_files(uploaded_files, mapping_dict)
+    with st.spinner("Consolidating files, please wait..."):
+        consolidated_df, excel_output, csv_output = consolidate_files(uploaded_files, mapping_dict)
 
-    # Preview first 10 rows of consolidated data
-    preview_df = pd.read_excel(BytesIO(excel_output.getvalue()))
-    st.dataframe(preview_df.head(10))
-
-    # Reset pointers for download
-    excel_output.seek(0)
-    csv_output.seek(0)
-
-    st.download_button("Download Consolidated Excel", data=excel_output, file_name="consolidated.xlsx")
-    st.download_button("Download Consolidated CSV", data=csv_output, file_name="consolidated.csv")
+    if consolidated_df is not None:
+        st.dataframe(consolidated_df.head(10))
+        st.download_button("Download Consolidated Excel", data=excel_output, file_name="consolidated.xlsx")
+        st.download_button("Download Consolidated CSV", data=csv_output, file_name="consolidated.csv")
